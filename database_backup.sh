@@ -87,6 +87,15 @@ function validate_installed_binaries(){
 	assert_is_installed "aws"
 }
 
+function check_files() {
+	local readonly BUCKET=$1
+	
+	#Listo todos los archivos que hay en el bucket, al resultado le hago split de espacios en blanco y obtengo la posición 4 (El nombre del archivo), a este resultado le hago otro split a través del caracter "/" para obtener unicamente el nombre
+
+	local readonly ALL_AMAZON_BACKUPS="$(aws s3 ls s3://$BUCKET --recursive | awk '{print $4}' | awk -F/ 'print $NF')"
+	
+}
+
 function make_backup() {
 	local readonly BAK=$(echo $HOME/mysql)
 	local readonly MYSQL=$(which mysql)	
@@ -110,6 +119,9 @@ function make_backup() {
 	FILE=$BAK/$FILENAME 
 	
 	$MYSQLDUMP -u $USER -h $HOST -p $PASS $DATABASE | $GZIP -9 > $FILE
+	
+	#creamos los archivos para ver si hay más de 7 y elimina el más viejo
+	check_files $BUCKET
 }
 
 echo "--------------------------" >> $BACKUP_LOG_FILENAME
