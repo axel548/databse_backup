@@ -93,7 +93,17 @@ function check_files() {
 	#Listo todos los archivos que hay en el bucket, al resultado le hago split de espacios en blanco y obtengo la posición 4 (El nombre del archivo), a este resultado le hago otro split a través del caracter "/" para obtener unicamente el nombre
 
 	local readonly ALL_AMAZON_BACKUPS="$(aws s3 ls s3://$BUCKET --recursive | awk '{print $4}' | awk -F/ 'print $NF')"
-	
+	local readonly NUMBER_OF_BACKUPS="$(echo "$ALL_AMAZON_BACKUPS" | wc -l )"
+
+	log_info "Encontrados ${NUMBER_OF_BACKUPS} archivos almacenados en S3"
+
+	#Si hay más de 6 archivos, empezamos a elminar los  archivos viejos, 6 porque al escribir el nuevo archivo será el archivo número 7
+	if [[ $NUMBER_OF_BACKUPS -gt 6 ]]; then
+		local readonly OLDER_FILE="$(echo "$ALL_AMAZON_BACKUPS" | sort | head -n 1)"
+		log_info "Archivo más viejo $OLDER_FILE"
+		aws s3 rm "s3://$BUCKET/$OLDER_FILE"
+		log_info "Eliminado de s3: $OLDER_FILE"
+	fi
 }
 
 function make_backup() {
@@ -122,12 +132,21 @@ function make_backup() {
 	
 	#creamos los archivos para ver si hay más de 7 y elimina el más viejo
 	check_files $BUCKET
+	
+	#Subimos el nuevo backup que acabamos de crear
+	log_info "Empezando la subida a s3"
+	aws s3 cp $BAK/$FILENAME s3://$BUCKET/$FILENAME
+
+	#Eliminamos el archivo de este servidor
+	log_info "Eliminando el archivo de este servidor"
+	rm $FILE
 }
 
 echo "--------------------------" >> $BACKUP_LOG_FILENAME
 echo "Ejecutando el script" >> $BACKUP_LOG_FILENAME 
 echo "--------------------------" >> $BACKUP_LOG_FILENAME
 
-#validate_env_variables 
-#validate_installed_binaries
+validate_env_variables 
+validate_installed_binaries
 make_backup
+en_script_execution
